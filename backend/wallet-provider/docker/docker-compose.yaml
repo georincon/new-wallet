@@ -1,0 +1,99 @@
+name: newwallet-provider
+
+# New Wallet Provider: instancia INDEPENDIENTE del wallet provider (clon de Spartans) dedicada a la
+# New Wallet. Identidad propia (CLIENTID, clave de firma, paquete Android), base de datos propia y
+# servicio de lista de estado propio. No comparte red, claves ni servicios con ninguna otra wallet.
+#
+# Requisito previo: ./scripts/generar-pki-newwallet.sh  (crea docker/newwallet/keystore.jks)
+# URL publica (alcanzable desde el telefono, p. ej. http://<ip-del-pc>:8097):  export NW_PROVIDER_PUBLIC_URL=...
+
+networks:
+  default:
+    driver: bridge
+
+services:
+  postgres-nwp:
+    image: postgres:18.4-alpine3.24
+    container_name: postgres-nwp
+    ports:
+      - "${NW_PROVIDER_DB_PORT:-5439}:5432"
+    environment:
+      - POSTGRES_DB=newwallet_provider
+      - POSTGRES_USER=newwallet
+      - POSTGRES_PASSWORD=newwallet
+    volumes:
+      - ../schemas/postgresql/V1.sql:/docker-entrypoint-initdb.d/01-V1.sql:RO
+      - postgres-nwp:/var/lib/postgresql
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U newwallet -d newwallet_provider" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  status-list-nwp:
+    build:
+      context: ./status-list
+      dockerfile: Dockerfile
+      args:
+        VERSION: v0.9.0
+    image: status-list-nwp:v0.9.0
+    container_name: status-list-nwp
+    ports:
+      # Keycloak (ABCA) consulta aquí la lista de estado de las atestaciones de la wallet.
+      - "${NW_STATUSLIST_PORT:-8197}:5000"
+    environment:
+      API_key: nw-status-list-key
+      STATUS_LIST_PUBLIC_URL: http://${NW_HOST_IP:-192.168.0.240}:${NW_STATUSLIST_PORT:-8197}/
+    volumes:
+      - ./status-list/config/config_service.py:/status-list/app/config_service.py
+      - ./status-list/certs:/status-list/certs
+      - status-lists-nwp:/var/opt/status_lists
+      - status-lists-backups-nwp:/var/opt/status_list_backup
+
+  newwallet-provider:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: newwallet-provider:local
+    container_name: newwallet-provider
+    depends_on:
+      postgres-nwp:
+        condition: service_healthy
+      status-list-nwp:
+        condition: service_started
+    ports:
+      - "${NW_PROVIDER_PORT:-8097}:8080"
+    volumes:
+      - ./newwallet/keystore.jks:/keystore.jks:ro
+    environment:
+      - SERVER_PORT=8080
+      - DATABASE_URL=r2dbc:pool:postgresql://postgres-nwp:5432/newwallet_provider
+      - DATABASE_USERNAME=newwallet
+      - DATABASE_PASSWORD=newwallet
+      - SIGNINGKEY_KEYSTOREFILE=/keystore.jks
+      - SIGNINGKEY_KEYSTOREPASSWORD=newwallet-keys
+      - SIGNINGKEY_KEYSTORETYPE=JKS
+      - SIGNINGKEY_KEYALIAS=newwallet-provider
+      - SIGNINGKEY_KEYPASSWORD=newwallet-signing
+      - SIGNINGKEY_ALGORITHM=ES256
+      - ISSUER_PUBLICURL=${NW_PROVIDER_PUBLIC_URL:-http://localhost:8097}
+      - ISSUER_NAME=New Wallet Provider
+      - CLIENTID=newwallet-app
+      - WALLETINSTANCEATTESTATION_WALLETNAME=New Wallet
+      - WALLETINSTANCEATTESTATION_WALLETLINK=${NW_PROVIDER_PUBLIC_URL:-http://localhost:8097}
+      - WALLETINSTANCEATTESTATION_WALLETVERSION=1.0.0
+      - WALLETINSTANCEATTESTATION_WALLETSOLUTIONCERTIFICATIONINFORMATION=${NW_PROVIDER_PUBLIC_URL:-http://localhost:8097}/certification
+      - KEYATTESTATION_CERTIFICATION=${NW_PROVIDER_PUBLIC_URL:-http://localhost:8097}/certification
+      - TOKENSTATUSLISTSERVICE_SERVICEURL=http://status-list-nwp:5000/token_status_list/take
+      - TOKENSTATUSLISTSERVICE_APIKEY=nw-status-list-key
+      - TOKENSTATUSLISTSERVICE_COUNTRY=CO
+      # Solo la New Wallet (paquete y llave de firma propios)
+      - PLATFORMKEYATTESTATIONVALIDATION_ANDROID_APPLICATIONS_0_PACKAGENAME=co.org.newwallet.app.dev
+      - PLATFORMKEYATTESTATIONVALIDATION_ANDROID_APPLICATIONS_0_SIGNINGCERTIFICATEDIGESTS_0=AdMZodoCPiGYIScQeMtugvDUZSGcxrht-KxtASkKi1k=
+      - PLATFORMKEYATTESTATIONVALIDATION_ANDROID_SOFTWAREATTESTATIONENABLED=true
+      - PLATFORMKEYATTESTATIONVALIDATION_ANDROID_UNLOCKEDBOOTLOADERALLOWED=true
+
+volumes:
+  postgres-nwp:
+  status-lists-nwp:
+  status-lists-backups-nwp:

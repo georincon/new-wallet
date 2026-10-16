@@ -1,0 +1,26 @@
+name: newwallet-gateway
+
+# Gateway HTTPS propio de New Wallet (no usa el haproxy ni el dominio de ninguna otra wallet).
+# Dominio:  https://newwallet.192-168-0-240.sslip.io:8447   (sslip.io resuelve a 192.168.0.240)
+#   /onboarding/*      -> backend de onboarding (host:8095)
+#   /wallet-provider/* -> newwallet-provider
+# Requiere que el provider esté arriba (backend/wallet-provider/docker) en la red newwallet-provider_default.
+
+services:
+  nw-haproxy:
+    image: haproxy:2.8.3
+    container_name: nw-haproxy
+    ports:
+      - "8447:8447"
+    volumes:
+      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - ./certs/newwallet.tls.pem:/etc/ssl/nw/newwallet.tls.pem:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - provider
+
+networks:
+  provider:
+    name: newwallet-provider_default
+    external: true

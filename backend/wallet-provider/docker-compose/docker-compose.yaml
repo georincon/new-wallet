@@ -1,0 +1,7 @@
+# New Wallet Provider — punto de entrada para lanzar el stack manualmente.
+# Solo INCLUYE el compose original (no lo modifica) y conserva su nombre de proyecto ('newwallet-provider'), para seguir
+# usando los mismos contenedores y volúmenes.
+name: newwallet-provider
+
+include:
+  - path: ../docker/docker-compose.yaml

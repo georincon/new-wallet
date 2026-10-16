@@ -1,0 +1,15 @@
+# New Wallet — levanta TODOS los servicios del proyecto con un solo comando:
+#   ./up.sh            (genera la PKI si falta, detecta la IP del PC y levanta todo)
+#   ./down.sh          (detiene todo; ./down.sh -v borra también los datos)
+#
+# Servicios (cada uno es un sub-stack independiente; ninguno comparte contenedores, redes, claves ni
+# puertos con la wallet de Avance):
+#   - onboarding.yaml                      backend de onboarding + visión + Postgres      (:8195)
+#   - ../backend/wallet-provider           New Wallet Provider (Spartans propio)          (:8097)
+#   - (aparte) ../../eudi-srv-pid-registraduria   issuer PID Registraduría + Keycloak + TLS (:9543),
+#     stack/proyecto PROPIO que up.sh levanta en su carpeta (no se incluye aquí)
+name: newwallet
+
+include:
+  - path: onboarding.yaml
+  - path: ../backend/wallet-provider/docker/docker-compose.yaml
