@@ -480,7 +480,6 @@ fun ResultScreen(
     canGoBack: Boolean,
     onBack: () -> Unit,
     onWelcome: () -> Unit,
-    onSkipIssuance: () -> Unit,
     onRetryData: () -> Unit,
     onRetryPhotos: () -> Unit
 ) {
@@ -505,12 +504,10 @@ fun ResultScreen(
         },
         subtitle = if (r?.decision == "APPROVED") null else r?.failureReason,
         buttonText = when {
-            r?.decision == "APPROVED" && state.issuing -> "Creando tu identidad digital…"
-            r?.decision == "APPROVED" && state.issuingError != null -> "Reintentar"
             r?.decision == "APPROVED" -> "Bienvenido a New Wallet"
             else -> "Volver a intentarlo"
         },
-        enabled = !state.issuing,
+        enabled = true,
         canGoBack = false,
         onBack = onBack,
         onNext = when {
@@ -568,11 +565,6 @@ fun ResultScreen(
             state.backendError?.let {
                 Spacer(Modifier.height(12.dp))
                 ErrorText(it)
-            }
-            state.issuingError?.let {
-                Spacer(Modifier.height(12.dp))
-                ErrorText("No pudimos crear tu credencial: $it")
-                androidx.compose.material3.TextButton(onClick = onSkipIssuance) { Text("Ir a mi wallet sin credencial") }
             }
         }
     }

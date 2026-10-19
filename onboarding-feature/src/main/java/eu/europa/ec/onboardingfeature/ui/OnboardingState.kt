@@ -12,7 +12,6 @@ import eu.europa.ec.onboardingfeature.navigation.Step
 import eu.europa.ec.onboardingfeature.network.BackendClient
 import eu.europa.ec.onboardingfeature.network.BackendResult
 import eu.europa.ec.onboardingfeature.network.DocumentUnreadableException
-import eu.europa.ec.onboardingfeature.network.PidOfferClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -193,35 +192,7 @@ class OnboardingState(
             (m["lastNamesSimilarity"]?.toDoubleOrNull() ?: 1.0) < 0.75
     }
 
-    var issuing by mutableStateOf(false)
-        private set
-
-    var issuingError by mutableStateOf<String?>(null)
-        private set
-
     private var completedMarked = false
-
-    /**
-     * Tras APPROVED: guarda los datos validados (una sola vez) y pide al issuer de la Registraduría la oferta
-     * de la PID. Devuelve el `offerUri` o null si falló (el motivo queda en [issuingError]).
-     */
-    suspend fun completeAndRequestPidOffer(issuerBaseUrl: String): String? {
-        val sessionId = backendResult?.sessionId ?: return null.also { issuingError = "No hay una validación aprobada." }
-        issuing = true
-        issuingError = null
-        return try {
-            if (!completedMarked) {
-                markCompleted()
-                completedMarked = true
-            }
-            withContext(Dispatchers.IO) { PidOfferClient(issuerBaseUrl).requestOffer(sessionId) }
-        } catch (e: Exception) {
-            issuingError = e.message ?: "No se pudo crear tu credencial."
-            null
-        } finally {
-            issuing = false
-        }
-    }
 
     /** Descarta solo las capturas (fotos) y el resultado; conserva los datos verificados. */
     fun prepareRetakePhotos() {

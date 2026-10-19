@@ -1,0 +1,32 @@
+services:
+  civica-trust-validator:
+    image: eudi-srv-trust-validator:civica
+    container_name: civica-trust-validator
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: "8080"
+      TRUST_VALIDATOR_DSS_FILE_CACHE_LOCATION: /tmp/dss-cache
+      TRUST_VALIDATOR_LOTE_FILE_CACHE_LOCATION: /tmp/lote-cache
+      TRUST_VALIDATOR_ENABLE_CERTIFICATE_REVOCATION_CHECK: "false"
+      TRUST_VALIDATOR_TRUST_SOURCES_WALLET_PROVIDERS_LOTL_LOCATION: https://civica.avance.org.co/tl-publisher/LOTL/current.xml
+      TRUST_VALIDATOR_TRUST_SOURCES_WALLET_PROVIDERS_LOTL_SIGNATURE_VERIFICATION_LOCATION: file:/trust/civica-lotl.jks
+      TRUST_VALIDATOR_TRUST_SOURCES_WALLET_PROVIDERS_LOTL_SIGNATURE_VERIFICATION_KEY_STORE_TYPE: JKS
+      TRUST_VALIDATOR_TRUST_SOURCES_WALLET_PROVIDERS_LOTL_SIGNATURE_VERIFICATION_PASSWORD: changeit
+      TRUST_VALIDATOR_TRUST_SOURCES_WALLET_PROVIDERS_LOTL_ISSUANCE_SERVICE: http://uri.etsi.org/TrstSvc/Svctype/Provider/Wallet
+      TRUST_VALIDATOR_TRUST_SOURCES_WALLET_PROVIDERS_LOTL_REVOCATION_SERVICE: http://uri.etsi.org/TrstSvc/Svctype/Provider/Wallet
+      TRUST_VALIDATOR_TRUST_SOURCES_PID_PROVIDERS_LOTL_LOCATION: https://civica.avance.org.co/tl-publisher/LOTL/current.xml
+      TRUST_VALIDATOR_TRUST_SOURCES_PID_PROVIDERS_LOTL_SIGNATURE_VERIFICATION_LOCATION: file:/trust/civica-lotl.jks
+      TRUST_VALIDATOR_TRUST_SOURCES_PID_PROVIDERS_LOTL_SIGNATURE_VERIFICATION_KEY_STORE_TYPE: JKS
+      TRUST_VALIDATOR_TRUST_SOURCES_PID_PROVIDERS_LOTL_SIGNATURE_VERIFICATION_PASSWORD: changeit
+      TRUST_VALIDATOR_TRUST_SOURCES_PID_PROVIDERS_LOTL_ISSUANCE_SERVICE: http://uri.etsi.org/TrstSvc/Svctype/Provider/PID
+      TRUST_VALIDATOR_TRUST_SOURCES_PID_PROVIDERS_LOTL_REVOCATION_SERVICE: http://uri.etsi.org/TrstSvc/Svctype/Provider/PID
+    volumes:
+      - /home/geovani/Descargas/generic/new-wallet/backend/trust-validator/civica-lotl.jks:/trust/civica-lotl.jks:ro
+    networks:
+      - default
+  pid-issuer:
+    environment:
+      ISSUER_TRUST_SERVICEURL: http://civica-trust-validator:8080/trust
+    depends_on:
+      civica-trust-validator:
+        condition: service_started

@@ -1,7 +1,7 @@
 package eu.europa.ec.onboardingfeature.ui.personalinfo
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,44 +13,56 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import eu.europa.ec.onboardingfeature.data.PersonalInfo
 import eu.europa.ec.onboardingfeature.data.PersonalInfoStore
 import eu.europa.ec.onboardingfeature.data.ValidationReport
-import eu.europa.ec.onboardingfeature.network.PidOfferClient
-import eu.europa.ec.corelogic.BuildConfig
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import eu.europa.ec.corelogic.controller.WalletCoreDocumentsController
+import eu.europa.ec.corelogic.model.DocumentIdentifier
 import eu.europa.ec.uilogic.component.content.ContentScreen
 import eu.europa.ec.uilogic.component.content.ContentTitle
 import eu.europa.ec.uilogic.component.content.ScreenNavigateAction
+import eu.europa.ec.uilogic.component.utils.LifecycleEffect
 import org.koin.compose.koinInject
 
 /** "Info Personal": datos de la cédula validados en el onboarding (solo lectura). */
 @Composable
-fun PersonalInfoScreen(onBack: () -> Unit, onOffer: (offerUri: String) -> Unit) {
+fun PersonalInfoScreen(onBack: () -> Unit, onRequestPid: () -> Unit) {
     val store = koinInject<PersonalInfoStore>()
+    val documents = koinInject<WalletCoreDocumentsController>()
     val loaded by produceState(initialValue = Loaded(false, null)) {
         value = Loaded(true, store.load())
+    }
+    var hasBothPidFormats by remember { mutableStateOf(false) }
+    val refreshPidStatus = {
+        documents.getAllDocumentsByType(listOf(DocumentIdentifier.MdocPid)).isNotEmpty() &&
+            documents.getAllDocumentsByType(listOf(DocumentIdentifier.SdJwtPid)).isNotEmpty()
+    }
+    LaunchedEffect(documents) { hasBothPidFormats = refreshPidStatus() }
+    LifecycleEffect(LocalLifecycleOwner.current, Lifecycle.Event.ON_RESUME) {
+        hasBothPidFormats = refreshPidStatus()
     }
     ContentScreen(
         navigatableAction = ScreenNavigateAction.BACKABLE,
         isLoading = !loaded.done,
         onBack = onBack,
-    ) { padding -> Body(loaded.info, padding, onOffer) }
+    ) { padding -> Body(loaded.info, hasBothPidFormats, padding, onRequestPid) }
 }
 
 private data class Loaded(val done: Boolean, val info: PersonalInfo?)
 
 @Composable
-private fun Body(info: PersonalInfo?, padding: PaddingValues, onOffer: (String) -> Unit) {
+private fun Body(info: PersonalInfo?, hasBothPidFormats: Boolean, padding: PaddingValues, onRequestPid: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -86,34 +98,11 @@ private fun Body(info: PersonalInfo?, padding: PaddingValues, onOffer: (String) 
             InfoRow("Lugar de expedición", info.expeditionPlace)
         }
         info.report?.let { ReportSection(it, info.validatedAtEpochMs) }
-        RequestPidSection(info, onOffer)
-    }
-}
-
-@Composable
-private fun RequestPidSection(info: PersonalInfo, onOffer: (String) -> Unit) {
-    val sessionId = info.sessionId ?: return
-    val scope = androidx.compose.runtime.rememberCoroutineScope()
-    var busy by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
-    var error by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
-    Column(modifier = Modifier.padding(top = 24.dp, bottom = 24.dp)) {
         androidx.compose.material3.Button(
-            onClick = {
-                busy = true; error = null
-                scope.launch {
-                    runCatching {
-                        withContext(Dispatchers.IO) { PidOfferClient(BuildConfig.NW_ISSUER_URL).requestOffer(sessionId) }
-                    }.onSuccess { onOffer(it) }.onFailure { error = it.message ?: "No se pudo crear tu credencial." }
-                    busy = false
-                }
-            },
-            enabled = !busy,
-            modifier = Modifier.fillMaxWidth()
-        ) { Text(if (busy) "Consultando a la Registraduría…" else "Obtener mi PID de la Registraduría") }
-        error?.let {
-            Text("No pudimos crear tu credencial: $it", color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
-        }
+            onClick = onRequestPid,
+            enabled = info.sessionId != null && !hasBothPidFormats,
+            modifier = Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 24.dp)
+        ) { Text(if (hasBothPidFormats) "Ya tienes los dos tipos de PID" else "Obtener mi PID de la Registraduría") }
     }
 }
 

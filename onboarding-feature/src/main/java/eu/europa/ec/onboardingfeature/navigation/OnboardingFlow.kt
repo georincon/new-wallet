@@ -1,8 +1,6 @@
 package eu.europa.ec.onboardingfeature.navigation
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.launch
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -135,11 +133,9 @@ enum class Step(
 @Composable
 fun OnboardingNavHost(
     state: OnboardingState,
-    issuerBaseUrl: String,
-    onFinished: (offerUri: String?) -> Unit,
+    onFinished: () -> Unit,
     navController: NavHostController = rememberNavController()
 ) {
-    val scope = rememberCoroutineScope()
     NavHost(
         navController = navController,
         startDestination = state.resumeStep().route
@@ -180,14 +176,8 @@ fun OnboardingNavHost(
                         state = state,
                         canGoBack = false,
                         onBack = onBack,
-                        onWelcome = {
-                            // Solo con resultado APPROVED: se guardan los datos validados y se marca completado.
-                            scope.launch {
-                                // Guarda los datos validados y pide a la Registraduría la oferta de la PID.
-                                state.completeAndRequestPidOffer(issuerBaseUrl)?.let { onFinished(it) }
-                            }
-                        },
-                        onSkipIssuance = { onFinished(null) },
+                        // La emisión de la PID se inicia desde Configuración > Info Personal.
+                        onWelcome = onFinished,
                         onRetryData = {
                             // Los datos escritos no coinciden con la cédula: se borran las fotos y se
                             // vuelve a pedir nombres, cédula y fecha de nacimiento.

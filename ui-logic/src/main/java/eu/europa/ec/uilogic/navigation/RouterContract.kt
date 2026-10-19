@@ -30,6 +30,7 @@ sealed class StartupScreens {
 sealed class OnboardingScreens {
     data object Onboarding : Screen(name = "ONBOARDING")
     data object PersonalInfo : Screen(name = "PERSONAL_INFO")
+    data object PidIssuanceRequest : Screen(name = "PID_ISSUANCE_REQUEST")
 }
 
 sealed class CommonScreens {

@@ -44,6 +44,7 @@ moduleConfig {
 
 dependencies {
     implementation(project(LibraryModule.CommonFeature.path))
+    implementation(project(LibraryModule.IssuanceFeature.path))
     implementation(libs.androidx.camera.core)
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
